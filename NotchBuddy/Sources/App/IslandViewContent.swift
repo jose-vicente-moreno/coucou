@@ -1570,6 +1570,8 @@ struct ModelPickerView: View {
             let visibleProviders = ChatProvider.allCases.filter { p in
                 if p == .ollama   { return !AppState.shared.ollamaServerURL.isEmpty   || state.chatProvider == .ollama }
                 if p == .lmstudio { return !AppState.shared.lmstudioServerURL.isEmpty || state.chatProvider == .lmstudio }
+                // Only offered when the `claude` command is actually on this Mac.
+                if p == .claudeCode { return ClaudeCodeChat.isAvailable || state.chatProvider == .claudeCode }
                 return true
             }
             ChipFlowLayout(spacing: 6) {
@@ -1652,7 +1654,8 @@ struct ModelPickerView: View {
                     ForEach(models, id: \.id) { model in
                         Button {
                             switch state.chatProvider {
-                            case .anthropic: state.claudeModel = model.id
+                            case .anthropic:  state.claudeModel = model.id
+                            case .claudeCode: state.claudeCodeChatModel = model.id
                             case .google:    state.googleChatModel = model.id
                             case .openai:    state.openAIChatModel = model.id
                             case .ollama:    state.ollamaChatModel = model.id

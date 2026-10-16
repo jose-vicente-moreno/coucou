@@ -211,8 +211,13 @@ final class ClaudeService {
     // Multi-turn conversation messages (for API)
     private var conversationMessages: [[String: Any]] = []
 
+    /// The conversation the `claude` command is holding for us, resumed on the
+    /// next turn. Only used by the Claude Code provider.
+    private var claudeCodeSession: String?
+
     func clearConversation() {
         conversationMessages = []
+        claudeCodeSession = nil
     }
 
     /// Resolved once: NSFullUserName() is a system call, and the name cannot change under us
@@ -246,6 +251,10 @@ final class ClaudeService {
             state.stateOverride = .thinking
             await DemoEngine.shared.streamChatResponse(for: query)
             state.stateOverride = nil
+            return
+        }
+        if state.chatProvider == .claudeCode {
+            await chatViaClaudeCode(query: query, context: context, state: state)
             return
         }
         guard state.chatProvider == .anthropic else {
@@ -295,6 +304,102 @@ final class ClaudeService {
         }
     }
 
+    // MARK: - Chat through the Claude Code CLI (no API key)
+
+    /// The same instructions, minus the promise of web search: this provider runs
+    /// with every tool turned off, so it cannot look anything up.
+    private var claudeCodeSystemPrompt: String {
+        systemPrompt.replacingOccurrences(
+            of: "You have web search access and can help with absolutely anything",
+            with: "You can help with absolutely anything"
+        )
+    }
+
+    /// One turn through the command. The command keeps the history itself, so only
+    /// the new message is sent and `--resume` carries the rest.
+    private func claudeCodeTurn(
+        userText: String, resume: String?, state: AppState, messageID: ChatMessage.ID
+    ) async throws -> (text: String, sessionId: String?) {
+        try await ClaudeCodeChat.streamChat(
+            prompt: userText,
+            systemPrompt: claudeCodeSystemPrompt,
+            model: state.claudeCodeChatModel,
+            resumeSessionId: resume
+        ) { [state, messageID] visible in
+            if !visible.isEmpty, state.stateOverride == .thinking {
+                state.stateOverride = nil   // hide typing dots on first visible text
+            }
+            if let idx = state.chatHistory.firstIndex(where: { $0.id == messageID }) {
+                state.chatHistory[idx].content = visible
+            }
+        }
+    }
+
+    func chatViaClaudeCode(query: String, context: PromptContext?, state: AppState) async {
+        // File and window context on the first message only, same as the other providers.
+        var userText = query
+        if conversationMessages.isEmpty, let context = context {
+            switch context {
+            case .window(let app, let title, let url):
+                var prefix = "Context — App: \(app), Window: \(title)"
+                if let url = url { prefix += ", URL: \(url)" }
+                userText = prefix + "\n\n" + query
+            case .file(let name, let fileURL):
+                // Tools are off, so the command cannot open the file itself: its text
+                // travels in the prompt, the way the local providers send it.
+                if let fileURL = fileURL,
+                   let text = try? String(contentsOf: fileURL, encoding: .utf8), !text.isEmpty {
+                    let truncated = text.count > 24_000
+                        ? String(text.prefix(24_000)) + "\n[truncated]"
+                        : text
+                    userText = "File: \(name)\n\n\(truncated)\n\n" + query
+                } else {
+                    userText = "File: \(name)\n\n" + query
+                }
+            }
+        }
+        conversationMessages.append(["role": "user", "content": userText])
+
+        // Placeholder (hidden until the first token by ChatBubble's empty-content guard)
+        let placeholder = ChatMessage(role: .assistant, content: "")
+        let messageID = placeholder.id
+        state.chatHistory.append(placeholder)
+        state.stateOverride = .thinking
+
+        do {
+            var outcome: (text: String, sessionId: String?)
+            do {
+                outcome = try await claudeCodeTurn(
+                    userText: userText, resume: claudeCodeSession, state: state, messageID: messageID
+                )
+            } catch let e as ClaudeCodeChatError
+                where claudeCodeSession != nil && e != .cliNotFound && e != .notSignedIn {
+                // The command no longer holds that conversation. Start a new one
+                // rather than lose the message the user just typed.
+                claudeCodeSession = nil
+                outcome = try await claudeCodeTurn(
+                    userText: userText, resume: nil, state: state, messageID: messageID
+                )
+            }
+
+            claudeCodeSession = outcome.sessionId
+            conversationMessages.append(["role": "assistant", "content": outcome.text])
+            if let idx = state.chatHistory.firstIndex(where: { $0.id == messageID }) {
+                state.chatHistory[idx].content = outcome.text
+            }
+            state.stateOverride = nil
+            state.view = .prompt
+            NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.happy)
+        } catch {
+            conversationMessages.removeLast()
+            state.chatHistory.removeAll { $0.id == messageID }
+            state.stateOverride = nil
+            let message = (error as? ClaudeCodeChatError)?.localizedDescription
+                ?? error.localizedDescription
+            await showError(message, state: state)
+        }
+    }
+
     // MARK: - OpenAI-compatible chat (Google Gemini / OpenAI / Ollama / LM Studio)
 
     func chatOpenAICompatible(query: String, context: PromptContext?, state: AppState) async {
@@ -313,7 +418,8 @@ final class ClaudeService {
             case .deepseek:  baseURL = "https://api.deepseek.com/v1"
             case .qwen:      baseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
             case .moonshot:  baseURL = "https://api.moonshot.cn/v1"
-            case .anthropic, .ollama, .lmstudio: baseURL = ""
+            // Neither of these is an HTTP endpoint; they never reach this path.
+            case .anthropic, .claudeCode, .ollama, .lmstudio: baseURL = ""
             }
         }
 

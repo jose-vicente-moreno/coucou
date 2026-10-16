@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Chat with your Claude account, no API key** *(macOS, GitHub build)*. A new **Claude Code** provider in the chat answers through the `claude` command already installed and signed in on your Mac, so the chat works without pasting an API key anywhere. Pick it above the chat box, or set the model in Settings → Chat; it offers Opus, Sonnet, Haiku and Fable. It runs the command with `--safe-mode`, so your own CLAUDE.md, hooks, plugins and MCP servers stay out of the answer, and with every tool turned off, so a question in the notch never reads or writes a file. Each turn resumes the same conversation, and an Anthropic key left in the environment is removed before the command starts, so the answer is always billed to the account and never to the API. The provider only appears when the command is found; the App Store build is sandboxed and cannot start it.
+
 ## Windows and Linux 0.5.0 — October 15, 2026
 
 Windows and Linux catch up with the Mac's 0.3.0 and 0.4.0: the Coucou window, Flow dictation, the Notetaker and « OK Coucou ». All of it free and open source.

@@ -95,6 +95,8 @@ struct SettingsView: View {
     @State private var lmstudioURL:  String = AppState.shared.lmstudioServerURL
     @State private var connectingOllama:    Bool = false
     @State private var connectingLMStudio:  Bool = false
+    @State private var claudeCodeAuth: ClaudeCodeChat.AuthInfo?
+    @State private var claudeCodeChecking: Bool = false
 
     // Integration keys
     @State private var resendKey: String    = KeychainStore.shared.get("resend-api-key")  ?? ""
@@ -1066,6 +1068,59 @@ struct SettingsView: View {
             }
             .padding(6)
         }
+
+        #if !APPSTORE
+        // Answers billed to the Claude account already signed in to Claude Code,
+        // so there is no key to paste. The sandboxed App Store build can't start
+        // the command, which is why this box is GitHub-build only.
+        GroupBox(String(localized: "Claude Code (no API key)")) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Circle().fill(Color(hex: ChatProvider.claudeCode.accentHex)).frame(width: 8, height: 8)
+                    Text("Claude Code").font(.system(size: 12, weight: .semibold))
+                    if claudeCodeAuth?.loggedIn == true {
+                        Text(String(localized: "Signed in"))
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "#22C55E"))
+                    }
+                }
+
+                if !ClaudeCodeChat.isAvailable {
+                    Text(String(localized: "Claude Code isn't installed on this Mac. Install it, then reopen this window."))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                } else if claudeCodeChecking {
+                    Text(String(localized: "Checking…"))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                } else if let auth = claudeCodeAuth, auth.loggedIn {
+                    Text(auth.email ?? String(localized: "Signed in with your Claude account"))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Picker(String(localized: "chat.model"), selection: $state.claudeCodeChatModel) {
+                        ForEach(ClaudeCodeChat.models, id: \.id) { preset in
+                            Text(preset.label).tag(preset.id)
+                        }
+                    }
+                } else {
+                    Text(String(localized: "Claude Code is installed but nobody is signed in. Run claude once in a terminal, then reopen this window."))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+
+                Text(String(localized: "The chat answers through the claude command on your Mac, with every tool turned off, so it reads and writes nothing."))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            .padding(6)
+            .task {
+                guard ClaudeCodeChat.isAvailable, claudeCodeAuth == nil else { return }
+                claudeCodeChecking = true
+                claudeCodeAuth = await ClaudeCodeChat.authStatus()
+                claudeCodeChecking = false
+            }
+        }
+        #endif
 
         GroupBox(String(localized: "chat.other-providers.title")) {
             VStack(alignment: .leading, spacing: 12) {
