@@ -193,12 +193,32 @@ jobs:
       # Makes the Release build downloadable from the run, so the app can be
       # tried on a Mac that has no Xcode. It is unsigned, so it needs an ad-hoc
       # signature before it will launch.
+      # A separate Release build for downloading and trying locally.
+      #
+      # It drops PHONE_LINK on purpose. An unsigned build carries no entitlements,
+      # so it has no iCloud container, and `CloudProbe.init()` traps inside CloudKit
+      # the moment the app finishes launching. The iPhone link cannot work in an
+      # unsigned copy anyway, so compiling it out is what makes the download
+      # actually start. Everything else, including the notch, the chat and the
+      # agent list, is unaffected.
+      - name: Build the downloadable app (no iCloud)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project NotchBuddy/NotchBuddy.xcodeproj \
+            -scheme NotchBuddy \
+            -configuration Release \
+            -derivedDataPath dd-local \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="" 2>&1 | tail -20
+
       - name: Package the Mac app
         run: |
           set -euo pipefail
-          APP=$(find ~/Library/Developer/Xcode/DerivedData -type d -name "Coucou.app" -path "*/Release/*" | head -1)
-          test -n "$APP"
-          echo "Packaging $APP"
+          APP=dd-local/Build/Products/Release/Coucou.app
+          test -d "$APP"
           ditto -c -k --keepParent "$APP" Coucou-unsigned.zip
 
       - name: Upload the Mac app
