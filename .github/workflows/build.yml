@@ -194,7 +194,6 @@ jobs:
       # tried on a Mac that has no Xcode. It is unsigned, so it needs an ad-hoc
       # signature before it will launch.
       - name: Package the Mac app
-        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           APP=$(find ~/Library/Developer/Xcode/DerivedData -type d -name "Coucou.app" -path "*/Release/*" | head -1)
@@ -203,7 +202,6 @@ jobs:
           ditto -c -k --keepParent "$APP" Coucou-unsigned.zip
 
       - name: Upload the Mac app
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: Coucou-unsigned
