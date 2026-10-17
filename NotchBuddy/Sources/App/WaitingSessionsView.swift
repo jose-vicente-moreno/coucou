@@ -56,6 +56,11 @@ struct WaitingSessionsView: View {
             }
         }
         .padding(12)
+        // A popover opens in a window of its own, which does not inherit the
+        // island's appearance, so on a Mac set to light mode this panel came up
+        // white against the black island. Same treatment the Flow window uses.
+        .background(Color(hex: "#0E0F11"))
+        .preferredColorScheme(.dark)
         .task {
             if sessions.isEmpty { state.refreshWaitingSessions() }
         }
