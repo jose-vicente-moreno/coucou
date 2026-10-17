@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Lets a feature branch be built and downloaded without merging it first.
+  workflow_dispatch:
 
 jobs:
   build:
@@ -187,3 +189,23 @@ jobs:
             -destination 'generic/platform=iOS' \
             build \
             CODE_SIGNING_ALLOWED=NO
+
+      # Makes the Release build downloadable from the run, so the app can be
+      # tried on a Mac that has no Xcode. It is unsigned, so it needs an ad-hoc
+      # signature before it will launch.
+      - name: Package the Mac app
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -type d -name "Coucou.app" -path "*/Release/*" | head -1)
+          test -n "$APP"
+          echo "Packaging $APP"
+          ditto -c -k --keepParent "$APP" Coucou-unsigned.zip
+
+      - name: Upload the Mac app
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Coucou-unsigned
+          path: Coucou-unsigned.zip
+          retention-days: 7
