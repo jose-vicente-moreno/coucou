@@ -138,6 +138,30 @@ struct PillSessionRegistry {
         return owner.session == session
     }
 
+    /// Every session behind every pill, oldest first within each pill.
+    ///
+    /// `displayOwner` deliberately returns only the oldest one, which is right
+    /// for naming a pill and wrong for listing what is waiting: three `claude`
+    /// in three projects share one pill, and the point of the waiting list is to
+    /// show all three. A session that has stopped stays here (`endTurn` only
+    /// clears `isWorking`) until `SessionEnd` or the silence sweep.
+    func allSessions() -> [(pill: String, display: Display, isWorking: Bool, lastSeen: Date)] {
+        var out: [(pill: String, display: Display, isWorking: Bool, lastSeen: Date)] = []
+        for (pillId, pill) in pills {
+            for id in pill.order {
+                guard let session = pill.sessions[id] else { continue }
+                out.append((
+                    pill: pillId,
+                    display: Display(session: id, projectName: session.projectName, cwd: session.cwd,
+                                     hostApp: session.hostApp, bundleId: session.bundleId),
+                    isWorking: session.isWorking,
+                    lastSeen: session.lastSeen
+                ))
+            }
+        }
+        return out
+    }
+
     func liveCount(pill: String) -> Int { pills[pill]?.order.count ?? 0 }
 
     func workingCount(pill: String) -> Int {

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **See every agent that has stopped, and tell it what to do next** *(macOS, GitHub build)*. A new **Agents waiting** panel next to the chat's model picker lists the Claude Code and Codex sessions that have stopped, one row per project, with the folder and how long it has been idle. Type the next instruction in a row and it goes straight to that session (`claude -p … --resume` or `codex exec resume`), or use **Send to all** to repeat one instruction across every waiting session, after a confirmation naming the count and the folders. The list is read from the transcripts on disk, so sessions from before Coucou was launched are there too, and it is merged with what the hooks saw, which adds the terminal each session ran in so a continued turn comes back on the same pill. Folders outside a repository, scratch directories and temporary paths are left out, which is what turns a few hundred daily transcripts into a list you can read; a setting shows everything instead. Continuing a session changes nothing about permissions: requests still come back to the notch to be approved by hand.
+
+- **Chat with your Claude account, no API key** *(macOS, GitHub build)*. A new **Claude Code** provider in the chat answers through the `claude` command already installed and signed in on your Mac, so the chat works without pasting an API key anywhere. Pick it above the chat box, or set the model in Settings → Chat; it offers Opus, Sonnet, Haiku and Fable. It runs the command with `--safe-mode`, so your own CLAUDE.md, hooks, plugins and MCP servers stay out of the answer, and with every tool turned off, so a question in the notch never reads or writes a file. Each turn resumes the same conversation, and an Anthropic key left in the environment is removed before the command starts, so the answer is always billed to the account and never to the API. The provider only appears when the command is found; the App Store build is sandboxed and cannot start it.
+
 ## Windows and Linux 0.5.0 — October 15, 2026
 
 Windows and Linux catch up with the Mac's 0.3.0 and 0.4.0: the Coucou window, Flow dictation, the Notetaker and « OK Coucou ». All of it free and open source.
