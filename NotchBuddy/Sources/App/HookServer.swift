@@ -482,8 +482,17 @@ final class HookServer: @unchecked Sendable {
             isExternalAgent = false
             hostApp = host.bundleId
         } else {
-            nbLog("Ignored \(name) from \(termProgram.isEmpty ? bundleId : termProgram) (\(projectName))")
-            return
+            // A Claude Code session whose host we cannot name: a background job, a
+            // `claude -p` run, anything started outside an editor or a known
+            // terminal. These used to be dropped right here, which made every
+            // headless session invisible to the island even though its hooks were
+            // firing correctly and the socket was live. They are ordinary Claude
+            // Code sessions and belong on the Claude pill like the rest. The only
+            // thing missing is the host app, so "Open terminal" has no window to
+            // raise and falls back to opening Terminal, which `openSessionApp`
+            // already does when it cannot activate anything.
+            agentId = "integration_claude"
+            isExternalAgent = false
         }
 
         let focused = state.focusId == agentId
