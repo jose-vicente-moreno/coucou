@@ -58,6 +58,24 @@ final class HookServer: @unchecked Sendable {
     private var focusBeforeApproval: String? = nil    // saved focus to restore after approval
     private var sessions = PillSessionRegistry()      // live sessions behind each pill
 
+    /// Every session the hooks have seen, in the shape the waiting list wants.
+    /// Reads the same state the event handlers do, so call it on the main queue.
+    func liveSessions() -> [ResumableSession] {
+        sessions.allSessions().compactMap { entry in
+            guard !entry.display.cwd.isEmpty else { return nil }
+            var session = ResumableSession(
+                agent: entry.pill == "agent_codex" ? .codex : .claudeCode,
+                sessionId: entry.display.session,
+                cwd: entry.display.cwd,
+                lastActivity: entry.lastSeen
+            )
+            session.hostApp = entry.display.hostApp
+            session.bundleId = entry.display.bundleId.isEmpty ? nil : entry.display.bundleId
+            session.isWorking = entry.isWorking
+            return session
+        }
+    }
+
     private init() {}
 
     // MARK: - Approval queue helpers
@@ -603,6 +621,9 @@ final class HookServer: @unchecked Sendable {
                 state.tasks[idx].finalLine = finalText
             }
             SoundEngine.shared.play("finish")
+            // The pill goes back to idle in 5.2 s, so the waiting list, not the
+            // pill state, is what remembers that this session needs an answer.
+            state.refreshWaitingSessions()
             if focused {
                 expandIfNeeded(to: .finished)
             } else {

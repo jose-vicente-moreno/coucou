@@ -15,6 +15,30 @@ final class AppState: ObservableObject {
     @Published var tasks: [AgentTask] = []
     @Published var focusId: String? = nil
 
+    // Agent sessions that have stopped and can be continued from the notch.
+    // One row per project, not per pill: three `claude` in three projects share
+    // a pill, and the whole point here is to show all three.
+    @Published var waitingSessions: [ResumableSession] = []
+    @Published var scanningWaitingSessions: Bool = false
+    private var waitingRefreshTask: Task<Void, Never>?
+
+    /// Rebuilds the waiting list from the transcripts on disk plus what the
+    /// hooks saw. Reading a few hundred transcripts takes a second or two, so it
+    /// runs off the main actor and only the result comes back.
+    func refreshWaitingSessions() {
+        waitingRefreshTask?.cancel()
+        let live = HookServer.shared.liveSessions()
+        scanningWaitingSessions = true
+        waitingRefreshTask = Task { [weak self] in
+            let rows = await Task.detached(priority: .utility) {
+                AgentSessionIndex.scan(live: live)
+            }.value
+            guard !Task.isCancelled else { return }
+            self?.waitingSessions = rows
+            self?.scanningWaitingSessions = false
+        }
+    }
+
     // Bot state override
     @Published var stateOverride: BotState? = nil
 

@@ -95,6 +95,9 @@ jobs:
       - name: Test Claude Code chat
         run: bash scripts/test-claude-code-chat.sh
 
+      - name: Test agent sessions
+        run: bash scripts/test-agent-sessions.sh
+
       - name: Test plan gauge
         run: bash scripts/test-plan-gauge.sh
 

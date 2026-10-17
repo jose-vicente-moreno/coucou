@@ -1347,6 +1347,7 @@ struct PromptView: View {
     @State private var text: String = ""
     @FocusState private var focused: Bool
     @State private var showModelPicker = false
+    @State private var showWaitingSessions = false
 
     #if !APPSTORE
     @State private var dictation = MacDictation()
@@ -1403,6 +1404,34 @@ struct PromptView: View {
                 }
 
                 HStack(spacing: 0) {
+                    #if !APPSTORE
+                    // The agents that have stopped and are waiting on an answer.
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                            showWaitingSessions.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "pause.circle")
+                                .font(.system(size: 9))
+                                .foregroundColor(Color(hex: "#7B8089"))
+                            Text(state.waitingSessions.isEmpty
+                                 ? String(localized: "Agents")
+                                 : "\(state.waitingSessions.count)")
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundColor(Color(hex: "#7B8089"))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showWaitingSessions, arrowEdge: .bottom) {
+                        WaitingSessionsView(state: state, isPresented: $showWaitingSessions)
+                            .frame(width: 340)
+                    }
+                    #endif
                     Spacer()
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
